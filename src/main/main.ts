@@ -8,12 +8,64 @@
  * When running `npm run build` or `npm run build:main`, this file is compiled to
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
-import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { exec } from 'child_process';
+import { app, BrowserWindow, ipcMain, powerMonitor, shell } from 'electron';
 import log from 'electron-log';
+import { autoUpdater } from 'electron-updater';
+import path from 'path';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
+
+const API_ENDPOINT = 'http://192.168.1.44:5000';
+
+function checkIfMuted(): any {
+  return new Promise((resolve, reject) => {
+    exec(
+      'powershell -command "Get-AudioDevice -PlaybackMute"',
+      (error, stdout) => {
+        if (error) {
+          console.error('Error getting mute status:', error);
+          return reject(error);
+        }
+        console.log('Muted:', stdout);
+        const muted = stdout.trim() === 'True';
+        resolve(muted);
+      },
+    );
+  });
+}
+
+powerMonitor.addListener('lock-screen', async () => {
+  fetch(`${API_ENDPOINT}/lock_event`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event_type: 'LOCK' }),
+  });
+
+  const isMuted = await checkIfMuted();
+  if (!isMuted) {
+    const command = `powershell -Command "$wshell = New-Object -ComObject wscript.shell; $wshell.SendKeys([char]173)"`;
+    require('child_process').exec(command);
+  }
+});
+
+powerMonitor.addListener('unlock-screen', async () => {
+  fetch(`${API_ENDPOINT}/lock_event`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event_type: 'UNLOCK' }),
+  });
+
+  const isMuted = await checkIfMuted();
+  if (isMuted) {
+    const command = `powershell -Command "$wshell = New-Object -ComObject wscript.shell; $wshell.SendKeys([char]173)"`;
+    require('child_process').exec(command);
+  }
+});
 
 class AppUpdater {
   constructor() {
