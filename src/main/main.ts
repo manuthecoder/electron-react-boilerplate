@@ -9,7 +9,16 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import { exec } from 'child_process';
-import { app, BrowserWindow, ipcMain, powerMonitor, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  powerMonitor,
+  shell,
+  Tray,
+} from 'electron';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
@@ -18,10 +27,13 @@ import { resolveHtmlPath } from './util';
 
 const API_ENDPOINT = 'http://192.168.1.44:5000';
 
+const gotTheLock = app.requestSingleInstanceLock();
+
 function checkIfMuted(): any {
   return new Promise((resolve, reject) => {
     exec(
       'powershell -command "Get-AudioDevice -PlaybackMute"',
+      // eslint-disable-next-line consistent-return
       (error, stdout) => {
         if (error) {
           console.error('Error getting mute status:', error);
@@ -108,23 +120,35 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
+const RESOURCES_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'assets')
+  : path.join(__dirname, '../../assets');
+
+const getAssetPath = (...paths: string[]): string => {
+  return path.join(RESOURCES_PATH, ...paths);
+};
+
 const createWindow = async () => {
   if (isDebug) {
     await installExtensions();
   }
 
-  const RESOURCES_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, '../../assets');
-
-  const getAssetPath = (...paths: string[]): string => {
-    return path.join(RESOURCES_PATH, ...paths);
-  };
-
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1024,
-    height: 728,
+    width: 500,
+    height: 700,
+    maxWidth: 500,
+    autoHideMenuBar: true,
+    center: true,
+    titleBarOverlay: {
+      color: 'rgba(0,0,0,0)',
+      symbolColor: '#fff',
+    },
+    titleBarStyle: 'hidden',
+    backgroundColor: nativeTheme.shouldUseDarkColors
+      ? 'hsl(174, 51.2%, 8.0%)'
+      : 'hsl(164, 88.2%, 96.7%)',
+
     icon: getAssetPath('icon.png'),
     webPreferences: {
       preload: app.isPackaged
@@ -187,3 +211,58 @@ app
     });
   })
   .catch(console.log);
+
+let tray: any;
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on(
+    'second-instance',
+    (event, commandLine, workingDirectory, additionalData) => {
+      // Print out data received from the second instance.
+      console.log(additionalData);
+
+      // Someone tried to run a second instance, we should focus our window.
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    },
+  );
+
+  app
+    .whenReady()
+    .then(() => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+
+      if (!tray) {
+        tray = new Tray(getAssetPath('icon.ico'));
+        const contextMenu = Menu.buildFromTemplate([
+          {
+            label: "Open Manu's Setup",
+            click: () => mainWindow && mainWindow.show(),
+          },
+          {
+            label: 'Quit',
+            click: () => {
+              app.quit();
+              app.exit();
+            },
+          },
+        ]);
+
+        tray.setToolTip('Dysperse');
+        tray.setContextMenu(contextMenu);
+        tray.on('click', () => mainWindow && mainWindow.show());
+      }
+    })
+    .catch(console.log);
+
+  app.on('browser-window-created', (e, window) => {
+    window.webContents.setWindowOpenHandler(({ url }) => {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  });
+}
