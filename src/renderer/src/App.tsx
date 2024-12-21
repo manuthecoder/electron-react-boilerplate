@@ -1,14 +1,8 @@
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { JSX, useState } from "react";
-import { Input } from "./components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { JSX } from "react";
 import { Checkbox } from "./components/ui/checkbox";
+import { Input } from "./components/ui/input";
 
 function CheckboxGroup({
   label,
@@ -109,7 +103,7 @@ function AmbientLighting() {
 }
 
 function LockOnLeave() {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send("ping");
+  // const ipcHandle = (): void => window.electron.ipcRenderer.send("ping");
 
   return (
     <Card

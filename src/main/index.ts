@@ -11,7 +11,6 @@ import {
   Tray,
 } from "electron";
 import { join } from "path";
-import path = require("path");
 
 const API_ENDPOINT = "http://192.168.1.44:5000";
 const gotTheLock = app.requestSingleInstanceLock();
@@ -139,7 +138,7 @@ if (!gotTheLock) {
 } else {
   app.on(
     "second-instance",
-    (event, commandLine, workingDirectory, additionalData) => {
+    (_event, _commandLine, _workingDirectory, additionalData) => {
       // Print out data received from the second instance.
       console.log(additionalData);
 
